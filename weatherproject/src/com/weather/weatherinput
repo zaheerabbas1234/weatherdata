@@ -1,0 +1,142 @@
+timestamp,location_id=1234,temperature=25.3,humidity=78.2,pressure=1012
+timestamp,location_id=1234,temperature=26.1,humidity=77.8,pressure=1011
+timestamp,location_id=5678,temperature=15.5,humidity=65.4,pressure=1008
+timestamp,location_id=5678,temperature=16.2,humidity=64.8,pressure=1007
+=======================================================================
+output
+======
+1234   25.7, 78.0, 1011.5
+5678   15.85, 65.1, 1007.5
+==================================================================
+Understanding How Output is Generated in a Hadoop MapReduce Job
+In a Hadoop MapReduce job, the output is generated through the following phases:
+
+Map Phase (Mapper):
+
+During this phase, the input data is read and processed by the Mapper. The Mapper extracts relevant information from each record and emits key-value pairs.
+Shuffle and Sort Phase:
+
+After the Mapper emits the key-value pairs, Hadoop automatically performs a shuffle and sort operation. In this phase:
+Hadoop groups the emitted key-value pairs by key (location in your case).
+The system then sorts the values for each key before sending them to the Reducer.
+Reduce Phase (Reducer):
+
+In the Reduce phase, the Reducer processes the key-value pairs that belong to the same key (location). It performs the necessary aggregation (e.g., calculating the average temperature, humidity, and pressure for each location).
+After processing the data, the Reducer writes the final output in the form of key-value pairs.
+Example Breakdown Based on Your Data
+Let's break down how the output is generated using the example weather data and the MapReduce program described earlier.
+
+Sample Input Data
+The input data format is semi-structured, where each record represents weather data for a specific location at a given time. The format is:
+=================================================================================
+timestamp,location_id=1234,temperature=25.3,humidity=78.2,pressure=1012
+timestamp,location_id=1234,temperature=26.1,humidity=77.8,pressure=1011
+timestamp,location_id=5678,temperature=15.5,humidity=65.4,pressure=1008
+timestamp,location_id=5678,temperature=16.2,humidity=64.8,pressure=1007
+============================================================================
+Mapper's Output (Map Phase)
+In the Mapper, we extract data from each line. For each record, the Mapper emits a key-value pair where:
+
+Key: The location_id (e.g., 1234, 5678).
+Value: A custom WeatherWritable object that contains the temperature, humidity, pressure, and a count (set to 1 for each record).
+For the above input data, the Mapper will emit the following key-value pairs:
+==============================================================================
+Key: 1234
+Value: WeatherWritable(25.3, 78.2, 1012, 1)
+=============================================================================
+Key: 1234
+Value: WeatherWritable(26.1, 77.8, 1011, 1)
+=============================================================================
+Key: 5678
+Value: WeatherWritable(15.5, 65.4, 1008, 1)
+=============================================================================
+Key: 5678
+Value: WeatherWritable(16.2, 64.8, 1007, 1)
+============================================================================
+Shuffle and Sort Phase
+In this phase, Hadoop sorts and groups the emitted key-value pairs by the key (location_id). The sorted groups will look like this:
+
+Group 1 (Key: 1234):
+
+(25.3, 78.2, 1012, 1), (26.1, 77.8, 1011, 1)
+===============================================
+Group 2 (Key: 5678):
+
+(15.5, 65.4, 1008, 1), (16.2, 64.8, 1007, 1)
+=============================================
+Each group is sent to a single Reducer.
+
+Reducer's Output (Reduce Phase)
+The Reducer processes each group of key-value pairs, aggregates the data, and calculates the average values for temperature, humidity, and pressure for each location_id.
+
+For each group:
+
+Group 1 (Key: 1234):
+
+For location 1234, the Reducer receives two records with the following values:
+Temperature: 25.3, 26.1
+Humidity: 78.2, 77.8
+Pressure: 1012, 1011
+Count: 1 (for each record)
+The Reducer calculates the average for each parameter:
+
+Average Temperature: (25.3 + 26.1) / 2 = 25.7
+Average Humidity: (78.2 + 77.8) / 2 = 78.0
+Average Pressure: (1012 + 1011) / 2 = 1011.5
+The Reducer outputs the following key-value pair:
+===================================================
+Key: 1234
+Value: 25.7, 78.0, 1011.5
+===============================================
+Group 2 (Key: 5678):
+
+For location 5678, the Reducer receives two records with the following values:
+Temperature: 15.5, 16.2
+Humidity: 65.4, 64.8
+Pressure: 1008, 1007
+Count: 1 (for each record)
+The Reducer calculates the average for each parameter:
+
+Average Temperature: (15.5 + 16.2) / 2 = 15.85
+Average Humidity: (65.4 + 64.8) / 2 = 65.1
+Average Pressure: (1008 + 1007) / 2 = 1007.5
+The Reducer outputs the following key-value pair:
+
+
+Key: 5678
+Value: 15.85, 65.1, 1007.5
+Final Output
+After the Reduce phase, the final output for the job will be written to the output directory specified in HDFS. The output will consist of key-value pairs where the key is the location_id, and the value is the aggregated weather data (average temperature, humidity, and pressure).
+
+The output on HDFS might look like this:
+
+================================================================
+1234   25.7, 78.0, 1011.5
+5678   15.85, 65.1, 1007.5
+1234: This location has an average temperature of 25.7°C, an average humidity of 78.0%, and an average pressure of 1011.5 hPa.
+5678: This location has an average temperature of 15.85°C, an average humidity of 65.1%, and an average pressure of 1007.5 hPa.
+How to Retrieve the Output
+Once the job is completed, the output is stored in the HDFS output path (e.g., /output_path). You can retrieve it using the following Hadoop command:
+================================================================================
+View Output in HDFS: To view the output in HDFS, use the hdfs dfs -cat command:
+
+
+hdfs dfs -cat /output_path/part-m-00000
+This will display the aggregated results (average weather data) for each location.
+
+Download the Output to Local File System: If you want to download the output files from HDFS to your local file system, use the hdfs dfs -get command:
+
+
+hdfs dfs -get /output_path /local_output_path
+This will copy the entire output directory from HDFS to your local machine.
+
+Summary of Output Generation
+Mapper extracts and emits location_id as the key and a WeatherWritable (containing temperature, humidity, pressure, and count) as the value.
+Shuffle and Sort groups the data by location_id.
+Reducer aggregates the data by calculating averages of temperature, humidity, and pressure for each location_id.
+The final output is a key-value pair where the key is location_id and the value is a string containing the averages of temperature, humidity, and pressure for that location.
+
+
+
+
+
